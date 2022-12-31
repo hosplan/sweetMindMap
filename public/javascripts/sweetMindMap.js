@@ -6,11 +6,8 @@ export class SweetMindMap {
         this.div_id = div_id; 
         this.width = document.getElementById(div_id).clientWidth;
         this.height = document.getElementById(div_id).clientHeight;
-        this.tree = d3.tree().size([this.height, this.width]);
-        this.root = data !== undefined ? d3.hierarchy(data) : undefined;
         this.total_g = undefined;
         this.nodes = undefined;
-        this.links = undefined;
         this.margin = { top: 20, right: 20, bottom: 30, left: 150 };
         this.svg = undefined;
         this.activeId = undefined;
@@ -56,6 +53,9 @@ export class SweetMindMap {
                 .attr('stroke-opacity', 1)
                 .attr('id', 'sweet_mindmap_svg');
 
+            this.total_g = this.svg.append('g')
+                .attr('class', 'total_g')
+                .attr('id', 'total_g');
             resolve({ w: width, h: height, id: 'sweet_mindmap_svg' });
         });
     }
@@ -113,23 +113,6 @@ export class SweetMindMap {
         });
     }
 
-    //계산
-    calc(d) {
-        let l = d.y;
-        if (d.position === 'left') {
-            l = (d.y) - w / 2;
-            l = (w / 2) + l;
-        }
-        return { x: d.x, y: l };
-    }
-    //직각 만들기
-    elbow(d) {
-        let source = this.calc(d.source);
-        let target = this.calc(d.target);
-        let hy = (target.y - source.y) / 2;
-        return `M${source.y},${source.x}H${source.y + hy}V${target.x}H${target.y}`;
-    }
-
     //셋팅
     setting() {
         return new Promise((resolve) => {
@@ -137,182 +120,132 @@ export class SweetMindMap {
                 .then(() => this.settingDiv())
                 .then(() => this.settingBodySvg())
                 .then((svg_obj) => resolve(svg_obj));
+
+            
         });
     }
 
     getGuid() {
-        const s4 = () => {
-            return Math.floor((1 + Math.random()) * 0x10000)
-                .toString(16)
-                .substring(1);
-        }
-        return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
-            s4() + '-' + s4() + s4() + s4();
-    }
+        return new Promise(resolve => {
+            const s4 = () => {
+                return Math.floor((1 + Math.random()) * 0x10000)
+                    .toString(16)
+                    .substring(1);
+            };
 
-    makeNode(name, value, data) {
-        const node = {
-            name: name === undefined ? `temp` : name,
-            value: value === undefined ? `temp` : value,
-            data: data === undefined ? {} : data,
-            guid: this.getGuid()
-        };
-
-        return node;
-    }
-
-    setData(data) {
-        //부모값을 찾은뒤
-        //해당 부모값의 
-    }
-
-    makeRoot(svg_obj) {
-        return new Promise((resolve, reject) => {
-            try {
-                this.total_g = this.svg.append('g')
-                    .attr('class', 'total_g')
-                    .attr('id', 'total_g');
-
-                if (this.root === undefined) {
-                    const root = {
-                        name: `root`,
-                        value: `root`,
-                        guid: this.getGuid(),
-                        // children: [
-                        //     {
-                        //         name : `node1`,
-                        //         value :`node1`,
-                        //         guid : this.getGuid(),
-                        //         status : 'complete',
-                        //         children : [
-                        //             {
-                        //                 name : `node2`,
-                        //                 value :`node2`,
-                        //                 guid : this.getGuid(),
-                        //                 status : 'inProgress'
-                        //             }
-                        //         ]
-                        //     },
-                        //     {
-                        //         name : `node1-1`,
-                        //         value :`node1-1`,
-                        //         guid : this.getGuid(),
-                        //         status : 'ready'
-                        //     }
-                        // ],
-                    }
-                    this.root = d3.hierarchy(root);
-                }
-                resolve();
-            }
-            catch (e) {
-                console.log(e);
-                reject(`Error : data is not`);
-            }
-        });
-    }
-
-    getDirection(data) {
-        if (!data) {
-            return 'root';
-        }
-        if (data.position) {
-            return data.position;
-        }
-        return this.getDirection(data.parent);
-    };
-
-
-    addNode(d) {
-        const selectNode = d3.select(`g[id='${d.data.guid}']`);
-        this.width = this.width * 1.1;
-        this.divideNum++;
-        let data = selectNode._groups[0][0].__data__;     
-        let dir = this.getDirection(data);
-        let cl = data[dir] || data.children;
-        if (!cl) {
-            cl = data.children = [];
-        }
-        
-        const newNode = { name : 'new_node', 
-        value : 'node', 
-        guid: this.getGuid(), 
-        status : 'ready'
-        };
-
-        let tempValue = d3.hierarchy(newNode);
-        tempValue.depth = data.depth + 1;
-        tempValue.height = data.height - 1;
-        tempValue.parent = data;
-        cl.push(tempValue);
-        this.render(data);
-    };
-
-    //x0, y0 좌표 만들기(x, y 좌표값 클론)
-    setCloneCooperation(){
-        this.nodes.forEach((d,i) => {
-            d.id = i;
-            d.x0 = d.x;
-            d.y0 = d.y;
-        });
-    }
-    renderRect(g_node){
-        g_node.append('rect')
-            .attr('width', treeShape.task.width)
-            .attr('height', treeShape.task.height)
-            .attr('rx', treeShape.task.r)
-            .attr('ry', treeShape.task.r)
-            .attr('x', `${treeShape.task.x}em`)
-            .attr('y', `${treeShape.task.y}em`)
-            .attr('data-sort', 'rect')
-            .attr('id', d => `rect_${d.data.guid}`)
-            .attr('fill', d => d.depth === 0 ? treeShape.task.fill.project : treeShape.task.fill.task)
-    }
-
-    renderCircle(e){
-      
-
-        let coords = d3.pointer(e);
-        this.total_g.append('g')
-            .attr('transform', `translate(${coords[0]},${coords[1]})`)
-            .attr('class', 'node_circle')
-            .append('circle')
-            .attr('r', 15)
-            .attr('id', this.getGuid())
-            .attr('fill', 'blue')
-            .on('mousedown', (event, d) => {                 
-                this.ptdata.push({ x: event.offsetX, y: event.offsetY });
-            })
-            .on('mouseup', (event,d) => {
-                this.ptdata.push({x : event.offsetX, y: event.offsetY});
-                console.log(this.ptdata);
-                console.log(event);
-                console.log("mouseup");
-                this.total_g.append('path')
-                        .data([this.ptdata])
-                        .attr('class','line')
-                        .attr('fill', 'none')
-                        .attr('stroke-width', '2px')
-                        .attr('stroke', '#000')
-                        .attr('d', this.line);
-                
-                let circles = d3.selectAll(`g[class='node_circle']`);
-                circles.raise();
+            Promise.all([s4(), s4(),s4(),s4(),s4(),s4(),s4(),s4(),])
+            .then((result) => {
+                resolve(
+                    result[0] +result[1] + '-' + result[2] + '-' + result[3] + '-' +
+                    result[4] + '-' + result[5] + result[6] + result[7]
+                );
             });
+        });
     }
+
+    shiftNode(){
+        let shift_data = this.ptdata.shift();
+        let this_circle = d3.select(`circle[id='circle_${shift_data.id}']`);
+        this_circle.attr('stroke', '#ffd500')
+            .attr('stroke-width', 0);
+    }
+
+    initPtdata(){
+        this.ptdata.length = 0;
+        let all_circle = d3.selectAll(`circle[class='node_part']`);
+        all_circle.attr('stroke','#ffd500')
+            .attr('stroke-width', 0);
+    }
+
+    connectNode(){
+        
+        this.total_g.append('path')
+        .data([this.ptdata])
+        .attr('class','line')
+        .attr('sourceId')
+        .attr('targetId')
+        .attr('fill', 'none')
+        .attr('stroke-width', '1px')
+        .attr('stroke', '#a8a8a8')
+        .attr('stroke-opacity', 0.8)
+        .attr('d', this.line)
+        .on('mouseenter', (event, d) =>{
+            
+        });
+        
+        this.shiftNode();
+    }
+
+    raiseAllNode(){
+        let node_part = d3.selectAll(`g[class='node_circle']`);
+        node_part.raise();
+    }
+
+    renderCircle(guid, node){
+        node.append('circle')
+        .attr('r', 15)
+        .attr('id', `circle_${guid}`)
+        .attr('fill', '#ffd500')
+        .attr('stroke', '#ffd500')
+        .attr('class', 'node_part')
+        .on('click', (event,d) => {
+            let this_g = d3.select(`g[id='${guid}']`);
+            let this_circle = d3.select(`circle[id='circle_${guid}']`);
+
+            this_circle
+            .attr('stroke', '#f3f3f3')
+            .attr('stroke-width', 5);
+
+            this.ptdata.push({
+                    id: guid,
+                    x:this_g.attr('coord_x'),
+                    y:this_g.attr('coord_y')
+                });
+
+            if(this.ptdata.length > 1) {
+                this.connectNode();
+                this.raiseAllNode();
+            }
+        });        
+    }
+
+    renderText(guid, node){
+        node.append('text')
+        .attr('dy', 40)
+        .attr('text-anchor', 'middle')
+        .attr('class', 'node_part')
+        .text('New Node');
+    }
+
+    addNode(e){
+        this.getGuid().then(guid => {
+            let coords = d3.pointer(e);
+            let node = this.total_g
+                .append('g')
+                .attr('transform', `translate(${coords[0]},${coords[1]})`)
+                .attr('class', 'node_circle')
+                .attr('coord_x', coords[0])
+                .attr('coord_y', coords[1])
+                .attr('id', `${guid}`);
+            
+            this.renderCircle(guid, node);
+            this.renderText(guid, node)
+        });
+    }
+
     render(source) {
         return new Promise((resolve, reject) => {
             this.svg
                 .attr('viewBox', [0, 0, this.width, this.height])
                 .on('dblclick', (event, d) => {
-                    this.renderCircle(event);
+                    this.addNode(event);
+                    this.initPtdata();
                 })
         });
     }
 
     spreadBranches() {
         this.setting()
-            .then((svg_size) => this.makeRoot(svg_size))
             .then(() => this.render(this.root, true));
     }
 }
