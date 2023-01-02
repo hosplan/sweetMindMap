@@ -27,7 +27,7 @@ export class SweetMindMap {
         this.line = d3.line()
             .x((d) => d.x)
             .y((d) => d.y);
-        this.ptdata = []; // reset point data
+        this.point_data = []; // reset point data
     }
 
     renderData() {
@@ -144,36 +144,67 @@ export class SweetMindMap {
     }
 
     shiftNode(){
-        let shift_data = this.ptdata.shift();
+        let shift_data = this.point_data.shift();
         let this_circle = d3.select(`circle[id='circle_${shift_data.id}']`);
         this_circle.attr('stroke', '#ffd500')
             .attr('stroke-width', 0);
     }
 
     initPtdata(){
-        this.ptdata.length = 0;
+        this.point_data.length = 0;
         let all_circle = d3.selectAll(`circle[class='node_part']`);
         all_circle.attr('stroke','#ffd500')
             .attr('stroke-width', 0);
     }
 
-    connectNode(){
-        
-        this.total_g.append('path')
-        .data([this.ptdata])
-        .attr('class','line')
-        .attr('sourceId')
-        .attr('targetId')
-        .attr('fill', 'none')
-        .attr('stroke-width', '1px')
-        .attr('stroke', '#a8a8a8')
-        .attr('stroke-opacity', 0.8)
-        .attr('d', this.line)
-        .on('mouseenter', (event, d) =>{
+    renderPath(guid){
+        return new Promise(resolve => {
+            let path = this.total_g
+                .append('path')
+                .data([this.point_data])
+                .attr('id', `path_${guid}`)
+                .attr('class','line')
+                .attr('sourceId',this.point_data[0].id)
+                .attr('targetId',this.point_data[1].id)
+                .attr('fill', 'none')
+                .attr('stroke-width', '1px')
+                .attr('stroke', '#a8a8a8')
+                .attr('stroke-opacity', 0.8)
+                .attr('d', this.line)
+                .on('mouseenter', (event, d) =>{
+                
+                });
+
+                let x_interpolate = d3.interpolate(this.point_data[0].x, this.point_data[1].x);
+                let y_interpolate = d3.interpolate(this.point_data[0].y, this.point_data[1].y);
+                let tt = x_interpolate(0.5);
+                let kk = y_interpolate(0.5);
+                this.total_g
+                .append('g')
+                .attr('transform', `translate(${tt},${kk})`)
+                .append('text')
+                .attr('font-weight', 200)
+                .attr('text-anchor', 'middle')
+                .text('New Relation');
+                // let text = this.total_g
+                // .append('text')
+                // .attr('x', )
+                // .attr('font-weight', 200);
+
+                // text.append('textPath')
+                //     .attr('xlink:href',`#path_${guid}`)
+                //     .text('테스트용');
             
+            resolve();
+        })    
+    }
+
+    connectNode(){
+        return new Promise(resolve => {
+            this.getGuid()
+                .then(guid => this.renderPath(guid))
+                .then(() => resolve());
         });
-        
-        this.shiftNode();
     }
 
     raiseAllNode(){
@@ -196,15 +227,17 @@ export class SweetMindMap {
             .attr('stroke', '#f3f3f3')
             .attr('stroke-width', 5);
 
-            this.ptdata.push({
+            this.point_data.push({
                     id: guid,
                     x:this_g.attr('coord_x'),
                     y:this_g.attr('coord_y')
                 });
 
-            if(this.ptdata.length > 1) {
-                this.connectNode();
-                this.raiseAllNode();
+            if(this.point_data.length > 1) {
+                this.connectNode().then(() => {
+                    this.shiftNode();
+                    this.raiseAllNode();
+                });
             }
         });        
     }
