@@ -22,12 +22,11 @@ export class SweetMindMap {
             'id': 'sweet_mindmap_body_div',
             'overflow': 'auto'
         }
-        this.data = {};
-        this.divideNum = 2;
         this.line = d3.line()
             .x((d) => d.x)
             .y((d) => d.y);
         this.point_data = []; // reset point data
+        this.keydown = undefined;
     }
 
     renderData() {
@@ -143,6 +142,10 @@ export class SweetMindMap {
         });
     }
 
+    popNode(){
+        this.point_data.pop();
+    }
+
     shiftNode(){
         let shift_data = this.point_data.shift();
         let this_circle = d3.select(`circle[id='circle_${shift_data.id}']`);
@@ -155,6 +158,14 @@ export class SweetMindMap {
         let all_circle = d3.selectAll(`circle[class='node_part']`);
         all_circle.attr('stroke','#ffd500')
             .attr('stroke-width', 0);
+    }
+
+    showEditNameText(){
+
+    }
+
+    hideEditNameText(){
+
     }
 
     renderPath(guid){
@@ -175,26 +186,28 @@ export class SweetMindMap {
                 
                 });
 
-                let x_interpolate = d3.interpolate(this.point_data[0].x, this.point_data[1].x);
-                let y_interpolate = d3.interpolate(this.point_data[0].y, this.point_data[1].y);
-                let tt = x_interpolate(0.5);
-                let kk = y_interpolate(0.5);
-                this.total_g
+            let x_interpolate = d3.interpolate(this.point_data[0].x, this.point_data[1].x);
+            let y_interpolate = d3.interpolate(this.point_data[0].y, this.point_data[1].y);
+        
+            let text_g = this.total_g
                 .append('g')
-                .attr('transform', `translate(${tt},${kk})`)
-                .append('text')
+                .style('cursor', 'pointer')
+                .attr('sourceId',this.point_data[0].id)
+                .attr('targetId',this.point_data[1].id)
+                .attr('transform', `translate(${x_interpolate(0.5)},${y_interpolate(0.5)})`)
+                .on('click', (event, d) => {
+                    event.preventDefault();
+                    this.showEditNameText();
+                });
+            
+            text_g.append('text')
+                .style('text-shadow', '-1px -1px 3px white, -1px 1px 3px white, 1px -1px 3px white, 1px 1px 3px white')
+                .attr('dy', '5')
+                .attr('font-size', 15)
                 .attr('font-weight', 200)
                 .attr('text-anchor', 'middle')
                 .text('New Relation');
-                // let text = this.total_g
-                // .append('text')
-                // .attr('x', )
-                // .attr('font-weight', 200);
 
-                // text.append('textPath')
-                //     .attr('xlink:href',`#path_${guid}`)
-                //     .text('테스트용');
-            
             resolve();
         })    
     }
@@ -211,8 +224,14 @@ export class SweetMindMap {
         let node_part = d3.selectAll(`g[class='node_circle']`);
         node_part.raise();
     }
+    
+    setActiveId(id){
+        this.activeId = id;
+    }
 
     renderCircle(guid, node){
+        this.setActiveId(guid);
+
         node.append('circle')
         .attr('r', 15)
         .attr('id', `circle_${guid}`)
@@ -221,31 +240,43 @@ export class SweetMindMap {
         .attr('class', 'node_part')
         .on('click', (event,d) => {
             let this_g = d3.select(`g[id='${guid}']`);
-            let this_circle = d3.select(`circle[id='circle_${guid}']`);
-
-            this_circle
-            .attr('stroke', '#f3f3f3')
-            .attr('stroke-width', 5);
-
             this.point_data.push({
                     id: guid,
                     x:this_g.attr('coord_x'),
                     y:this_g.attr('coord_y')
                 });
+            
+        
+            if(this.keydown !== 'Meta'){
+                let this_circle = d3.select(`circle[id='circle_${guid}']`);
+                this.setActiveId(guid);
+                this_circle
+                    .attr('stroke', '#f3f3f3')
+                    .attr('stroke-width', 5);    
+            }
 
-            if(this.point_data.length > 1) {
+            //keydown 값이 Meta 인 경우 다중 선택 모드로 간다.
+            if(this.point_data.length > 1 && this.keydown === 'Meta'){
+                this.connectNode().then(() => {
+                    this.popNode();
+                    this.raiseAllNode();
+                });
+            }
+            else if(this.point_data.length > 1) {
                 this.connectNode().then(() => {
                     this.shiftNode();
                     this.raiseAllNode();
                 });
-            }
+            } 
         });        
     }
 
     renderText(guid, node){
         node.append('text')
+        .style('text-shadow', '-1px -1px 3px white, -1px 1px 3px white, 1px -1px 3px white, 1px 1px 3px white')
         .attr('dy', 40)
         .attr('text-anchor', 'middle')
+        .attr('font-weight', 200)
         .attr('class', 'node_part')
         .text('New Node');
     }
@@ -266,6 +297,29 @@ export class SweetMindMap {
         });
     }
 
+    //keyEvent
+    injectKeyEvent(){
+        d3.select('body')
+            .on('keydown', (event,d) => {
+                console.log(event);
+                this.keydown = event.key;
+                if(event.key === 'Escape') {
+                    return this.initPtdata();
+                }
+                else if(event.key === 'Backspace' && this.activeId !== undefined){
+                    d3.select(`g[id='${this.activeId}']`).remove();
+                    d3.selectAll(`path[sourceId='${this.activeId}']`).remove();
+                    d3.selectAll(`path[targetId='${this.activeId}']`).remove();
+                    d3.selectAll(`g[sourceId='${this.activeId}']`).remove();
+                    d3.selectAll(`g[targetId='${this.activeId}']`).remove();
+                    this.initPtdata();
+                }
+            })
+            .on('keyup', (event, d) => {
+                this.keydown = '';
+            })
+    }
+    
     render(source) {
         return new Promise((resolve, reject) => {
             this.svg
@@ -274,6 +328,8 @@ export class SweetMindMap {
                     this.addNode(event);
                     this.initPtdata();
                 })
+                
+            this.injectKeyEvent();
         });
     }
 
