@@ -27,6 +27,7 @@ export class SweetMindMap {
             .y((d) => d.y);
         this.point_data = []; // reset point data
         this.keydown = undefined;
+        this.activeEditId = undefined;
     }
 
     renderData() {
@@ -119,8 +120,6 @@ export class SweetMindMap {
                 .then(() => this.settingDiv())
                 .then(() => this.settingBodySvg())
                 .then((svg_obj) => resolve(svg_obj));
-
-            
         });
     }
 
@@ -153,15 +152,58 @@ export class SweetMindMap {
             .attr('stroke-width', 0);
     }
 
+    //point 해제
     initPtdata(){
+        this.activeId = undefined;
         this.point_data.length = 0;
         let all_circle = d3.selectAll(`circle[class='node_part']`);
         all_circle.attr('stroke','#ffd500')
             .attr('stroke-width', 0);
     }
 
-    showEditNameText(){
+    //텍스트 수정
+    updateText = (id) => {
+        d3.select(`text[id='text_${id}']`)
+            .text(document.getElementById(`mindMap_edit_${id}`).value);
+        this.removeEditBox(id);
+        this.initPtdata();
+    }
 
+     //수정 텍스트 박스 삭제
+     removeEditBox = (id) => {
+        let e = document.getElementById(`mindMap_edit_${id}`);
+        if(e !== null){
+            e.remove();
+            d3.select(`text[id='text_${id}']`)
+            .attr('font-weight', 200);
+        }
+    }
+
+    showEditNameText(id, type){
+        this.initPtdata();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+        if(id === this.activeEditId){
+            return;
+        }else if(id !== undefined){
+            this.removeEditBox(this.activeEditId);
+            let g = d3.select(`g[id='text_g_${id}']`);
+            
+            g.append('foreignObject')
+                .attr('x', `-8.2em`)
+                .attr('y', () => type === 'node' ? `1.9em` : `0.1em`)
+                .attr('width', 250)
+                .attr('height', 50)
+                .html(() => {
+                    return `<input type='text' guid='${id}' id='mindMap_edit_${id}' class='mindMap_edit_box'
+                        placeholder='새로운 이름 입력'
+                        style='font-size:15px; border:0; border-radius: 15px; outline:none; padding-left:10px; margin-left:20px; margin-top:20px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px'; />`
+                });         
+
+            d3.select(`text[id='text_${id}']`)
+                .attr('font-weight', 500);
+
+            this.activeEditId = id;
+        }
     }
 
     hideEditNameText(){
@@ -192,21 +234,25 @@ export class SweetMindMap {
             let text_g = this.total_g
                 .append('g')
                 .style('cursor', 'pointer')
+                .attr('id', `text_g_${guid}`)
                 .attr('sourceId',this.point_data[0].id)
                 .attr('targetId',this.point_data[1].id)
                 .attr('transform', `translate(${x_interpolate(0.5)},${y_interpolate(0.5)})`)
                 .on('click', (event, d) => {
                     event.preventDefault();
-                    this.showEditNameText();
+                    this.showEditNameText(guid, 'path');
                 });
             
+
             text_g.append('text')
                 .style('text-shadow', '-1px -1px 3px white, -1px 1px 3px white, 1px -1px 3px white, 1px 1px 3px white')
                 .attr('dy', '5')
+                .attr('id', `text_${guid}`)
                 .attr('font-size', 15)
                 .attr('font-weight', 200)
                 .attr('text-anchor', 'middle')
-                .text('New Relation');
+                .text('New Relation')
+            
 
             resolve();
         })    
@@ -231,7 +277,6 @@ export class SweetMindMap {
 
     renderCircle(guid, node){
         this.setActiveId(guid);
-
         node.append('circle')
         .attr('r', 15)
         .attr('id', `circle_${guid}`)
@@ -272,11 +317,20 @@ export class SweetMindMap {
     }
 
     renderText(guid, node){
-        node.append('text')
+        let text_g = node.append('g')
+            .attr('id', `text_g_${guid}`)
+            .style('cursor', 'pointer')
+            .on('click', (event,d) => {
+                this.showEditNameText(guid, 'node');
+            });
+
+        text_g.append('text')
         .style('text-shadow', '-1px -1px 3px white, -1px 1px 3px white, 1px -1px 3px white, 1px 1px 3px white')
         .attr('dy', 40)
+        .attr('id', `text_${guid}`)
         .attr('text-anchor', 'middle')
         .attr('font-weight', 200)
+        .attr('cursor','pointer')
         .attr('class', 'node_part')
         .text('New Node');
     }
@@ -313,6 +367,9 @@ export class SweetMindMap {
                     d3.selectAll(`g[sourceId='${this.activeId}']`).remove();
                     d3.selectAll(`g[targetId='${this.activeId}']`).remove();
                     this.initPtdata();
+                }
+                else if(event.key === 'Enter' && this.activeEditId !== undefined) {
+                    this.updateText(this.activeEditId);
                 }
             })
             .on('keyup', (event, d) => {
